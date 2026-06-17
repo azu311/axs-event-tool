@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AXS イベント登録サポート｜VOREAS</title>
+<script src="vendor/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --vor-orange:#F26F21;
+    --vor-orange-dark:#D85A12;
+    --ink:#1A1714;
+    --ink-soft:#5A5248;
+    --line:#E3DCD2;
+    --paper:#F7F4EE;
+    --card:#FFFFFF;
+    --field:#FBF9F5;
+    --ok:#2E7D4F;
+    --warn:#C0392B;
+    --mono:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",YuGothic,Meiryo,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:var(--sans);
+    line-height:1.55;
+    -webkit-font-smoothing:antialiased;
+  }
+  header.top{
+    background:var(--ink);
+    color:#fff;
+    padding:18px 24px;
+    border-bottom:4px solid var(--vor-orange);
+  }
+  header.top .eyebrow{
+    font-size:11px;
+    letter-spacing:.22em;
+    text-transform:uppercase;
+    color:var(--vor-orange);
+    font-weight:700;
+  }
+  header.top h1{
+    margin:2px 0 0;
+    font-size:20px;
+    font-weight:700;
+    letter-spacing:.01em;
+  }
+  header.top p{
+    margin:4px 0 0;
+    font-size:12.5px;
+    color:#C9C2B8;
+  }
+  .wrap{
+    max-width:1180px;
+    margin:0 auto;
+    padding:24px;
+    display:grid;
+    grid-template-columns:minmax(320px,400px) 1fr;
+    gap:24px;
+    align-items:start;
+  }
+  @media (max-width:880px){
+    .wrap{grid-template-columns:1fr;}
+  }
+
+  /* ---- input panel ---- */
+  .panel{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:20px;
+    position:sticky;
+    top:16px;
+  }
+  @media (max-width:880px){.panel{position:static;}}
+  .panel h2{
+    font-size:13px;
+    letter-spacing:.04em;
+    margin:0 0 14px;
+    padding-bottom:10px;
+    border-bottom:1px solid var(--line);
+    text-transform:uppercase;
+    color:var(--ink-soft);
+  }
+  .field{margin-bottom:15px;}
+  .field > label{
+    display:block;
+    font-size:12.5px;
+    font-weight:700;
+    margin-bottom:5px;
+  }
+  .hint{font-size:11px;color:var(--ink-soft);font-weight:400;}
+  input[type=text],input[type=date],input[type=time],input[type=number]{
+    width:100%;
+    padding:9px 11px;
+    border:1px solid var(--line);
+    border-radius:7px;
+    background:var(--field);
+    font-family:var(--sans);
+    font-size:14px;
+    color:var(--ink);
+  }
+  input:focus{outline:2px solid var(--vor-orange);outline-offset:0;border-color:transparent;}
+  .seg{display:flex;gap:8px;}
+  .seg label{
+    flex:1;
+    text-align:center;
+    padding:9px 6px;
+    border:1px solid var(--line);
+    border-radius:7px;
+    background:var(--field);
+    font-size:13px;
+    cursor:pointer;
+    user-select:none;
+  }
+  .seg input{position:absolute;opacity:0;pointer-events:none;}
+  .seg label:has(input:checked){
+    background:var(--vor-orange);
+    border-color:var(--vor-orange);
+    color:#fff;
+    font-weight:700;
+  }
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;}
+  .counter{font-size:11px;margin-top:4px;font-family:var(--mono);}
+  .counter.over{color:var(--warn);font-weight:700;}
+  .counter.ok{color:var(--ok);}
+  .namewarn{font-size:11px;color:var(--warn);margin-top:4px;display:none;}
+  .namewarn.show{display:block;}
+
+  /* ---- output panel ---- */
+  .out-head{
+    display:flex;align-items:center;justify-content:space-between;
+    margin-bottom:14px;flex-wrap:wrap;gap:8px;
+  }
+  .out-head .note{font-size:12px;color:var(--ink-soft);}
+  .copyall{
+    background:var(--ink);color:#fff;border:0;border-radius:7px;
+    padding:8px 14px;font-size:12.5px;font-weight:700;cursor:pointer;
+    font-family:var(--sans);
+  }
+  .copyall:hover{background:#000;}
+  .copyall.done{background:var(--ok)!important;}
+
+  .group{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:12px;
+    overflow:hidden;
+    margin-bottom:16px;
+  }
+  .group > h3{
+    margin:0;
+    font-size:13px;
+    background:var(--paper);
+    padding:11px 16px;
+    border-bottom:1px solid var(--line);
+    display:flex;align-items:center;gap:9px;
+  }
+  .group > h3 .num{
+    font-family:var(--mono);font-size:11px;color:#fff;
+    background:var(--vor-orange);border-radius:4px;
+    padding:2px 6px;font-weight:700;
+  }
+  .item{
+    display:grid;
+    grid-template-columns:150px 1fr auto;
+    gap:12px;align-items:center;
+    padding:9px 16px;
+    border-bottom:1px solid #F0EBE3;
+  }
+  .item:last-child{border-bottom:0;}
+  .item .k{font-size:12.5px;color:var(--ink-soft);font-weight:700;}
+  .item .v{
+    font-family:var(--mono);font-size:13.5px;
+    word-break:break-all;color:var(--ink);
+  }
+  .item .v.empty{color:#B8AE9F;font-style:italic;font-family:var(--sans);}
+  .item .v.fixed{color:var(--ink);}
+  .tag{
+    display:inline-block;font-size:10px;font-family:var(--sans);
+    background:#EFE9DF;color:var(--ink-soft);border-radius:4px;
+    padding:1px 6px;margin-left:6px;vertical-align:middle;font-weight:700;
+  }
+  .copy{
+    border:1px solid var(--line);background:var(--field);
+    border-radius:6px;padding:6px 10px;font-size:11.5px;
+    cursor:pointer;font-family:var(--sans);color:var(--ink-soft);
+    white-space:nowrap;font-weight:700;
+  }
+  .copy:hover{border-color:var(--vor-orange);color:var(--vor-orange);}
+  .copy.done{background:var(--ok);color:#fff;border-color:var(--ok);}
+  @media (max-width:880px){
+    .item{grid-template-columns:1fr auto;}
+    .item .k{grid-column:1 / -1;}
+  }
+
+  textarea#eticket{
+    width:100%;min-height:150px;resize:vertical;
+    font-family:var(--mono);font-size:13.5px;line-height:1.7;
+    padding:12px;border:1px solid var(--line);border-radius:8px;
+    background:var(--field);color:var(--ink);
+  }
+  .eticket-wrap{padding:14px 16px;}
+  .eticket-wrap .lbl{font-size:11px;color:var(--ink-soft);margin-bottom:8px;}
+  .eticket-actions{margin-top:10px;}
+  footer.foot{
+    max-width:1180px;margin:0 auto;padding:8px 24px 40px;
+    font-size:11px;color:var(--ink-soft);
+  }
+  .toast{
+    position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);
+    background:var(--ink);color:#fff;padding:10px 20px;border-radius:8px;
+    font-size:13px;opacity:0;pointer-events:none;transition:.25s;z-index:50;
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="eyebrow">VOREAS · AXS BackOffice</div>
+  <h1>イベント登録サポート</h1>
+  <p>開催情報を入力すると、登録マニュアルに沿った各項目を自動生成します。項目ごとにコピーして転記できます。</p>
+</header>
+
+<div class="wrap">
+
+  <!-- ============ INPUT ============ -->
+  <section class="panel">
+    <h2>開催情報を入力</h2>
+
+    <div class="field">
+      <label>開催日 <span class="hint">（必須）</span></label>
+      <input type="date" id="eventDate">
+    </div>
+
+    <div class="field">
+      <label>イベント名 <span class="hint">／ 全角30文字まで</span></label>
+      <input type="text" id="eventName" placeholder="例：シーズン報告会">
+      <div class="counter" id="nameCounter">全角換算 0 / 30</div>
+      <div class="namewarn" id="nameWarn"></div>
+    </div>
+
+    <div class="field">
+      <label>シーズン区分</label>
+      <div class="seg" id="seasonSeg">
+        <label><input type="radio" name="season" value="on">オンシーズン</label>
+        <label><input type="radio" name="season" value="off" checked>オフシーズン</label>
+      </div>
+      <div class="hint" style="margin-top:5px;">オンシーズン＝10月〜翌4月のリーグ戦／オフシーズン＝その他</div>
+    </div>
+
+    <div class="field">
+      <label>座席タイプ</label>
+      <div class="seg" id="seatSeg">
+        <label><input type="radio" name="seat" value="reserved" checked>指定席</label>
+        <label><input type="radio" name="seat" value="free">自由席</label>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>会場名</label>
+      <input type="text" id="venue" placeholder="例：旭川市総合体育館">
+      <div class="hint" style="margin-top:4px;">指定席はベニューマップ／ETicketに使用。自由席はマップに Test_GA_Map を使用。</div>
+    </div>
+
+    <div class="field">
+      <label>同日イベントの連番 <span class="hint">／ 参照IDに使用</span></label>
+      <input type="number" id="seq" value="1" min="1" max="99">
+    </div>
+
+    <div class="field">
+      <label>時間</label>
+      <div class="row3">
+        <div>
+          <input type="time" id="openTime">
+          <div class="hint" style="text-align:center;margin-top:3px;">開場（任意）</div>
+        </div>
+        <div>
+          <input type="time" id="startTime">
+          <div class="hint" style="text-align:center;margin-top:3px;">開始</div>
+        </div>
+        <div>
+          <input type="time" id="endTime">
+          <div class="hint" style="text-align:center;margin-top:3px;">終了</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ OUTPUT ============ -->
+  <section>
+    <div class="out-head">
+      <div class="note">登録画面の項目順に並んでいます。<strong>固定</strong>＝常に同じ値です。</div>
+      <div style="display:flex;gap:8px;">
+        <button class="copyall" id="copyAll">サマリーを全コピー</button>
+        <button class="copyall" id="exportXlsx" style="background:var(--vor-orange);">Excelで出力</button>
+      </div>
+    </div>
+
+    <!-- Group 1 -->
+    <div class="group">
+      <h3><span class="num">1</span>イベント登録（基本情報）</h3>
+      <div class="item"><div class="k">名称</div><div class="v" id="o_name"></div><button class="copy" data-t="o_name">コピー</button></div>
+      <div class="item"><div class="k">参照ID</div><div class="v" id="o_refid"></div><button class="copy" data-t="o_refid">コピー</button></div>
+      <div class="item"><div class="k">ベニューマップ</div><div class="v" id="o_venue1"></div><button class="copy" data-t="o_venue1">コピー</button></div>
+      <div class="item"><div class="k">表示ステータス</div><div class="v fixed">表示<span class="tag">固定</span></div><button class="copy" data-t="o_status">コピー</button><span id="o_status" hidden>表示</span></div>
+      <div class="item"><div class="k">Webトラッキング</div><div class="v fixed">Google Analytics<span class="tag">固定</span></div><button class="copy" data-t="o_track">コピー</button><span id="o_track" hidden>Google Analytics</span></div>
+      <div class="item"><div class="k">OTSショッピング継続</div><div class="v fixed">チェックを外す<span class="tag">固定</span></div><span></span></div>
+      <div class="item"><div class="k">シーズンカテゴリー</div><div class="v" id="o_seasoncat"></div><button class="copy" data-t="o_seasoncat">コピー</button></div>
+      <div class="item"><div class="k">イベントカテゴリー</div><div class="v" id="o_eventcat"></div><button class="copy" data-t="o_eventcat">コピー</button></div>
+      <div class="item"><div class="k">開催日時</div><div class="v" id="o_start"></div><button class="copy" data-t="o_start">コピー</button></div>
+      <div class="item"><div class="k">終了日時</div><div class="v" id="o_end"></div><button class="copy" data-t="o_end">コピー</button></div>
+      <div class="item"><div class="k">Eチケット配信日時</div><div class="v fixed">2025/04/01<span class="tag">固定</span></div><button class="copy" data-t="o_dist">コピー</button><span id="o_dist" hidden>2025/04/01</span></div>
+      <div class="item"><div class="k">FlashSeats配信日時</div><div class="v fixed">2025/04/01<span class="tag">固定</span></div><button class="copy" data-t="o_fs">コピー</button><span id="o_fs" hidden>2025/04/01</span></div>
+      <div class="item"><div class="k">標準郵送出荷日時</div><div class="v fixed">2025/04/01<span class="tag">固定</span></div><button class="copy" data-t="o_ship">コピー</button><span id="o_ship" hidden>2025/04/01</span></div>
+    </div>
+
+    <!-- Group 2 -->
+    <div class="group">
+      <h3><span class="num">2</span>ゾーン追加（メイン）</h3>
+      <div class="item"><div class="k">名称</div><div class="v" id="o_zonename"></div><button class="copy" data-t="o_zonename">コピー</button></div>
+      <div class="item"><div class="k">ベニューマップ</div><div class="v" id="o_venue2"></div><button class="copy" data-t="o_venue2">コピー</button></div>
+      <div class="item"><div class="k">FlashSeatsオーナー</div><div class="v fixed">Voreas Hokkaido<span class="tag">固定</span></div><button class="copy" data-t="o_owner">コピー</button><span id="o_owner" hidden>Voreas Hokkaido</span></div>
+      <div class="item"><div class="k">タイプ</div><div class="v fixed">Admissions<span class="tag">固定</span></div><button class="copy" data-t="o_type">コピー</button><span id="o_type" hidden>Admissions</span></div>
+      <div class="item"><div class="k">エンティティ</div><div class="v fixed">Voreas Hokkaido<span class="tag">固定</span></div><button class="copy" data-t="o_entity">コピー</button><span id="o_entity" hidden>Voreas Hokkaido</span></div>
+      <div class="item"><div class="k">決済コード</div><div class="v fixed">VLEAGUE<span class="tag">固定</span></div><button class="copy" data-t="o_pay">コピー</button><span id="o_pay" hidden>VLEAGUE</span></div>
+    </div>
+
+    <!-- Group 3 -->
+    <div class="group">
+      <h3><span class="num">3</span>アクセスコントロール / ポータル</h3>
+      <div class="item"><div class="k">チャネル</div><div class="v fixed">AXS<span class="tag">固定</span></div><span></span></div>
+      <div class="item"><div class="k">開始日</div><div class="v" id="o_acStart"></div><button class="copy" data-t="o_acStart">コピー</button></div>
+      <div class="item"><div class="k">終了日</div><div class="v" id="o_acEnd"></div><button class="copy" data-t="o_acEnd">コピー</button></div>
+      <div class="item"><div class="k">ポータルペイメント</div><div class="v fixed">有効化<span class="tag">固定</span></div><span></span></div>
+      <div class="item"><div class="k">ポータルチケット転送</div><div class="v fixed">FlashSeatsのみ<span class="tag">固定</span></div><span></span></div>
+      <div class="item"><div class="k">ポータルオファー</div><div class="v fixed">Hidden<span class="tag">固定</span></div><span></span></div>
+      <div class="item"><div class="k">未払い→FlashSeats変換</div><div class="v fixed">No（チケット印刷のみチェック）<span class="tag">固定</span></div><span></span></div>
+    </div>
+
+    <!-- Group 4 -->
+    <div class="group">
+      <h3><span class="num">4</span>ETicket Format</h3>
+      <div class="eticket-wrap">
+        <div class="lbl">6行構成。必要に応じて編集してからコピーできます（5行目の開場/開始の表記など）。</div>
+        <textarea id="eticket"></textarea>
+        <div class="eticket-actions">
+          <button class="copy" id="copyEticket" style="padding:8px 14px;">ETicketをコピー</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Group 5 -->
+    <div class="group">
+      <h3><span class="num">5</span>注意事項 / メールテンプレート</h3>
+      <div class="item"><div class="k">注意事項</div><div class="v fixed">主催 株式会社VOREAS ／ お問合せ info@voreas.jp<span class="tag">固定</span></div><button class="copy" data-t="o_notice">コピー</button><span id="o_notice" hidden>主催株式会社VOREAS
+お問合せ info@voreas.jp</span></div>
+      <div class="item"><div class="k">Eメールテンプレート</div><div class="v fixed">VLEAGUE<span class="tag">固定</span></div><button class="copy" data-t="o_mailtpl">コピー</button><span id="o_mailtpl" hidden>VLEAGUE</span></div>
+    </div>
+
+  </section>
+</div>
+
+<footer class="foot">
+  入力内容はこの画面内でのみ処理され、外部に送信・保存されません。固定値はマニュアル基準のため、運用変更時はこのファイル内の値を更新してください。
+</footer>
+
+<div class="toast" id="toast">コピーしました</div>
+
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+  const els = {
+    date:$('eventDate'), name:$('eventName'), venue:$('venue'), seq:$('seq'),
+    open:$('openTime'), start:$('startTime'), end:$('endTime'),
+    counter:$('nameCounter'), nameWarn:$('nameWarn'), eticket:$('eticket')
+  };
+
+  // ---- helpers ----
+  const pad = n => String(n).padStart(2,'0');
+  function ymd(){ // yyyymmdd
+    if(!els.date.value) return '';
+    return els.date.value.replace(/-/g,'');
+  }
+  function slash(){ // yyyy/mm/dd
+    if(!els.date.value) return '';
+    return els.date.value.replace(/-/g,'/');
+  }
+  function season(){ return document.querySelector('input[name=season]:checked').value; }
+  function seat(){ return document.querySelector('input[name=seat]:checked').value; }
+
+  // 全角換算カウント（半角=0.5, 全角=1）
+  function fullWidthCount(s){
+    let c=0;
+    for(const ch of s){
+      const code = ch.codePointAt(0);
+      // 半角英数記号・半角カナ
+      if((code>=0x20 && code<=0x7E) || (code>=0xFF61 && code<=0xFF9F)) c+=0.5;
+      else c+=1;
+    }
+    return c;
+  }
+
+  // ---- season / event category ----
+  function categories(){
+    const d = els.date.value;
+    if(!d) return {sc:'', ec:''};
+    const [y,m] = d.split('-').map(Number);
+    if(season()==='on'){
+      let s,e;
+      if(m>=10){ s=y; e=y+1; }      // 10-12月 → y / y+1
+      else { s=y-1; e=y; }          // 1-9月（主に1-4月）→ y-1 / y
+      return { sc:`${s}-${e}`, ec:`${s}-${e}レギュラーシーズン` };
+    } else {
+      return { sc:`${y}`, ec:`${y}プレシーズン` };
+    }
+  }
+
+  function eticketText(){
+    const venue = els.venue.value.trim();
+    const name = els.name.value.trim();
+    let l5='';
+    const op = els.open.value, st = els.start.value, en = els.end.value;
+    if(op && st) l5 = `開場 ${op}　開始 ${st}`;
+    else if(st) l5 = `開始 ${st}`;
+    else if(op) l5 = `開場 ${op}`;
+    const l6 = en ? `終了 ${en}` : '';
+    return [
+      'VOREAS HOKKAIDO',
+      name,
+      venue,
+      '',
+      l5,
+      l6
+    ].join('\n');
+  }
+
+  // ---- render ----
+  let eticketTouched = false;
+  function setV(id, val, placeholder){
+    const el = $(id);
+    if(!el) return;
+    if(val){ el.textContent = val; el.classList.remove('empty'); el.classList.add('fixed'); }
+    else { el.textContent = placeholder || '—'; el.classList.add('empty'); el.classList.remove('fixed'); }
+  }
+
+  function render(){
+    const date = ymd();
+    const name = els.name.value.trim();
+    const venue = els.venue.value.trim();
+    const seqN = pad(parseInt(els.seq.value||'1',10));
+    const cat = categories();
+
+    // 名称: yyyymmdd + イベント名
+    setV('o_name', (date && name) ? (date + name) : '', '開催日とイベント名を入力');
+    // 参照ID: yyyymmdd-NN-VOR
+    setV('o_refid', date ? `${date}-${seqN}-VOR` : '', '開催日を入力');
+    // ベニューマップ（基本情報）= 会場名
+    setV('o_venue1', venue, '会場名を入力');
+    // カテゴリー
+    setV('o_seasoncat', cat.sc, '開催日を入力');
+    setV('o_eventcat', cat.ec, '開催日を入力');
+    // 開催日時 / 終了日時
+    setV('o_start', (slash() && els.start.value) ? `${slash()} ${els.start.value}` : (slash()? `${slash()} （開始時間を入力）`:''), '開催日・開始時間を入力');
+    setV('o_end', slash() ? `${slash()} 23:59` : '', '開催日を入力');
+
+    // ゾーン
+    setV('o_zonename', name, 'イベント名を入力');
+    const vmap = seat()==='free' ? 'Test_GA_Map' : venue;
+    setV('o_venue2', vmap, (seat()==='free'?'Test_GA_Map':'会場名を入力'));
+
+    // アクセスコントロール
+    setV('o_acStart', slash() ? `${slash()} 00:00` : '', '開催日を入力');
+    setV('o_acEnd', slash() ? `${slash()} 23:59` : '', '開催日を入力');
+
+    // ETicket（未編集なら自動更新）
+    if(!eticketTouched){ els.eticket.value = eticketText(); }
+
+    // 文字数カウント
+    const fw = fullWidthCount(name);
+    els.counter.textContent = `全角換算 ${fw % 1 === 0 ? fw : fw.toFixed(1)} / 30`;
+    els.counter.className = 'counter ' + (fw>30 ? 'over' : (name? 'ok':''));
+
+    // オンシーズンの命名チェック
+    let warn = '';
+    if(season()==='on' && name){
+      if(/\s+vs\s+|\svs|vs\s/i.test(name)) warn = '「vs」の前後に半角スペースを入れないでください。';
+      else if(!/vs/i.test(name)) warn = 'オンシーズンはホームチーム名（VOREAS）から記載してください。';
+      else if(!/^VOREAS/i.test(name)) warn = '必ずホームチーム名（VOREAS）から記載してください。';
+    }
+    els.nameWarn.textContent = warn;
+    els.nameWarn.classList.toggle('show', !!warn);
+  }
+
+  // ---- toast + copy ----
+  const toast = $('toast');
+  let toastTimer;
+  function showToast(msg){
+    toast.textContent = msg || 'コピーしました';
+    toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(()=>toast.classList.remove('show'),1400);
+  }
+  function copyText(text, btn){
+    if(!text){ showToast('コピーする値がありません'); return; }
+    navigator.clipboard.writeText(text).then(()=>{
+      showToast('コピーしました');
+      if(btn){ btn.classList.add('done'); const o=btn.textContent; btn.textContent='済'; setTimeout(()=>{btn.classList.remove('done');btn.textContent=o;},900); }
+    }).catch(()=>showToast('コピーに失敗しました'));
+  }
+
+  document.addEventListener('click', e=>{
+    const b = e.target.closest('.copy');
+    if(!b) return;
+    if(b.id==='copyEticket'){ copyText(els.eticket.value, b); return; }
+    const t = b.getAttribute('data-t');
+    if(!t) return;
+    const node = $(t);
+    const txt = node ? (node.hidden ? node.textContent : node.textContent) : '';
+    // empty placeholder は除外
+    const real = (node && node.classList.contains('empty')) ? '' : txt;
+    copyText(real.replace(/—/g,''), b);
+  });
+
+  // サマリー全コピー
+  $('copyAll').addEventListener('click', ()=>{
+    const cat = categories();
+    const g = id => { const n=$(id); if(!n) return ''; return n.classList.contains('empty')?'':n.textContent; };
+    const lines = [
+      '【イベント登録】',
+      `名称：${g('o_name')}`,
+      `参照ID：${g('o_refid')}`,
+      `ベニューマップ：${g('o_venue1')}`,
+      `表示ステータス：表示`,
+      `Webトラッキング：Google Analytics`,
+      `OTSショッピング継続：チェックを外す`,
+      `シーズンカテゴリー：${g('o_seasoncat')}`,
+      `イベントカテゴリー：${g('o_eventcat')}`,
+      `開催日時：${g('o_start')}`,
+      `終了日時：${g('o_end')}`,
+      `Eチケット配信日時：2025/04/01`,
+      `FlashSeats配信日時：2025/04/01`,
+      `標準郵送出荷日時：2025/04/01`,
+      '',
+      '【ゾーン（メイン）】',
+      `名称：${g('o_zonename')}`,
+      `ベニューマップ：${g('o_venue2')}`,
+      `FlashSeatsオーナー：Voreas Hokkaido`,
+      `タイプ：Admissions`,
+      `エンティティ：Voreas Hokkaido`,
+      `決済コード：VLEAGUE`,
+      '',
+      '【アクセスコントロール】',
+      `チャネル：AXS`,
+      `開始日：${g('o_acStart')}`,
+      `終了日：${g('o_acEnd')}`,
+      `ポータルペイメント：有効化`,
+      `ポータルチケット転送：FlashSeatsのみ`,
+      `ポータルオファー：Hidden`,
+      `未払い→FlashSeats変換：No（チケット印刷のみチェック）`,
+      '',
+      '【ETicket Format】',
+      els.eticket.value,
+      '',
+      '【注意事項】',
+      '主催株式会社VOREAS',
+      'お問合せ info@voreas.jp',
+      'Eメールテンプレート：VLEAGUE'
+    ];
+    copyText(lines.join('\n'), $('copyAll'));
+  });
+
+  // ---- Excel / CSV 出力 ----
+  function buildRows(){
+    const g = id => { const n=$(id); if(!n) return ''; return n.classList.contains('empty')?'':n.textContent; };
+    // [セクション, 項目, 値]
+    return [
+      ['セクション','項目','値'],
+      ['基本情報','名称', g('o_name')],
+      ['基本情報','参照ID', g('o_refid')],
+      ['基本情報','ベニューマップ', g('o_venue1')],
+      ['基本情報','表示ステータス','表示'],
+      ['基本情報','Webトラッキング','Google Analytics'],
+      ['基本情報','OTSショッピング継続','チェックを外す'],
+      ['基本情報','シーズンカテゴリー', g('o_seasoncat')],
+      ['基本情報','イベントカテゴリー', g('o_eventcat')],
+      ['基本情報','開催日時', g('o_start')],
+      ['基本情報','終了日時', g('o_end')],
+      ['基本情報','Eチケット配信日時','2025/04/01'],
+      ['基本情報','FlashSeats配信日時','2025/04/01'],
+      ['基本情報','標準郵送出荷日時','2025/04/01'],
+      ['ゾーン（メイン）','名称', g('o_zonename')],
+      ['ゾーン（メイン）','ベニューマップ', g('o_venue2')],
+      ['ゾーン（メイン）','FlashSeatsオーナー','Voreas Hokkaido'],
+      ['ゾーン（メイン）','タイプ','Admissions'],
+      ['ゾーン（メイン）','エンティティ','Voreas Hokkaido'],
+      ['ゾーン（メイン）','決済コード','VLEAGUE'],
+      ['アクセスコントロール','チャネル','AXS'],
+      ['アクセスコントロール','開始日', g('o_acStart')],
+      ['アクセスコントロール','終了日', g('o_acEnd')],
+      ['アクセスコントロール','ポータルペイメント','有効化'],
+      ['アクセスコントロール','ポータルチケット転送','FlashSeatsのみ'],
+      ['アクセスコントロール','ポータルオファー','Hidden'],
+      ['アクセスコントロール','未払い→FlashSeats変換','No（チケット印刷のみチェック）'],
+      ['ETicket Format','本文（6行）', els.eticket.value],
+      ['注意事項','注意事項','主催株式会社VOREAS\nお問合せ info@voreas.jp'],
+      ['注意事項','Eメールテンプレート','VLEAGUE']
+    ];
+  }
+
+  function fileBase(){
+    const date = ymd() || 'nodate';
+    const name = (els.name.value.trim() || 'event').replace(/[\\/:*?"<>|\s]/g,'_');
+    return `AXS_${date}_${name}`;
+  }
+
+  function exportCSV(rows){
+    const esc = v => '"' + String(v==null?'':v).replace(/"/g,'""') + '"';
+    const body = rows.map(r => r.map(esc).join(',')).join('\r\n');
+    const blob = new Blob(['\uFEFF'+body], {type:'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = fileBase()+'.csv';
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a); URL.revokeObjectURL(url);
+  }
+
+  function exportExcel(){
+    const rows = buildRows();
+    const btn = $('exportXlsx');
+    if(typeof XLSX === 'undefined'){
+      exportCSV(rows);
+      showToast('Excel未取得のためCSVで出力しました');
+      return;
+    }
+    try{
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+      ws['!cols'] = [{wch:20},{wch:24},{wch:48}];
+      // セクション列の縦結合
+      const merges = [];
+      let startRow = 1, cur = rows[1] ? rows[1][0] : null;
+      for(let i=2;i<=rows.length;i++){
+        const sec = rows[i] ? rows[i][0] : null;
+        if(sec !== cur){
+          if(i-1 > startRow) merges.push({s:{r:startRow,c:0},e:{r:i-1,c:0}});
+          startRow = i; cur = sec;
+        }
+      }
+      ws['!merges'] = merges;
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'AXS登録');
+      XLSX.writeFile(wb, fileBase()+'.xlsx');
+      showToast('Excelを出力しました');
+      btn.classList.add('done'); const o=btn.textContent; btn.textContent='出力しました';
+      setTimeout(()=>{btn.classList.remove('done');btn.textContent=o;},1100);
+    }catch(err){
+      exportCSV(rows);
+      showToast('Excel生成に失敗したためCSVで出力しました');
+    }
+  }
+  $('exportXlsx').addEventListener('click', exportExcel);
+
+  // ---- listeners ----
+  ['date','name','venue','seq','open','start','end'].forEach(k=>{
+    els[k].addEventListener('input', render);
+  });
+  document.querySelectorAll('input[name=season],input[name=seat]').forEach(r=>r.addEventListener('change', render));
+  els.eticket.addEventListener('input', ()=>{ eticketTouched = true; });
+  // 開催情報変更時はETicketの自動再生成を再開できるよう、時間/会場/名前変更でtouchedを解除
+  ['name','venue','open','start','end'].forEach(k=>{
+    els[k].addEventListener('input', ()=>{ eticketTouched = false; render(); });
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
