@@ -284,14 +284,6 @@ if(typeof XLSX==='undefined'){
     </div>
 
     <div class="field">
-      <label>座席タイプ</label>
-      <div class="seg" id="seatSeg">
-        <label><input type="radio" name="seat" value="reserved" checked>指定席</label>
-        <label><input type="radio" name="seat" value="free">自由席</label>
-      </div>
-    </div>
-
-    <div class="field">
       <label>会場名 / ベニューマップ</label>
       <select id="venue">
         <option value="リック＆スー旭川体育館" selected>リック＆スー旭川体育館</option>
@@ -305,7 +297,7 @@ if(typeof XLSX==='undefined'){
         <option value="東鷹栖いなほ公園">東鷹栖いなほ公園</option>
         <option value="鷹栖町総合体育館">鷹栖町総合体育館</option>
       </select>
-      <div class="hint" style="margin-top:4px;">指定席はベニューマップ／ETicketに使用。自由席はマップに Test_GA_Map を使用。</div>
+      <div class="hint" style="margin-top:4px;">リック＆スー旭川体育館 → マップ「リック＆スー旭川体育館_2026」／その他 → 「Set seat_GA_Map」を自動出力。ETicketの会場名にも使用。</div>
     </div>
 
     <div class="field">
@@ -434,7 +426,13 @@ if(typeof XLSX==='undefined'){
     return els.date.value.replace(/-/g,'/');
   }
   function season(){ return document.querySelector('input[name=season]:checked').value; }
-  function seat(){ return document.querySelector('input[name=seat]:checked').value; }
+
+  // ベニューマップ: 会場で自動判定
+  function venueMap(){
+    return els.venue.value === 'リック＆スー旭川体育館'
+      ? 'リック＆スー旭川体育館_2026'
+      : 'Set seat_GA_Map';
+  }
 
   // シーズンに応じたイベント名
   // オンシーズン: MMDDヴォレアスvs対戦相手 / オフシーズン: 自由入力のイベント名
@@ -525,8 +523,8 @@ if(typeof XLSX==='undefined'){
 
     // 参照ID: yyyymmdd-NN-VOR
     setV('o_refid', date ? `${date}-${seqN}-VOR` : '', '開催日を入力');
-    // ベニューマップ（基本情報）= 会場名
-    setV('o_venue1', venue, '会場名を入力');
+    // ベニューマップ（基本情報）= 会場判定
+    setV('o_venue1', venueMap(), '会場を選択');
     // カテゴリー
     setV('o_seasoncat', cat.sc, '開催日を入力');
     setV('o_eventcat', cat.ec, '開催日を入力');
@@ -536,8 +534,8 @@ if(typeof XLSX==='undefined'){
 
     // ゾーン名称 = イベント名
     setV('o_zonename', eventName, isOn ? '開催日と対戦相手を選択' : 'イベント名を入力');
-    const vmap = seat()==='free' ? 'Test_GA_Map' : venue;
-    setV('o_venue2', vmap, (seat()==='free'?'Test_GA_Map':'会場名を入力'));
+    // ゾーン ベニューマップ = 会場判定（基本情報と同じ）
+    setV('o_venue2', venueMap(), '会場を選択');
 
     // アクセスコントロール
     setV('o_acStart', slash() ? `${slash()} 00:00` : '', '開催日を入力');
@@ -735,7 +733,7 @@ if(typeof XLSX==='undefined'){
   ['date','name','venue','seq','open','start','end'].forEach(k=>{
     els[k].addEventListener('input', render);
   });
-  document.querySelectorAll('input[name=season],input[name=seat]').forEach(r=>r.addEventListener('change', ()=>{ eticketTouched=false; render(); }));
+  document.querySelectorAll('input[name=season]').forEach(r=>r.addEventListener('change', ()=>{ eticketTouched=false; render(); }));
   els.opponent.addEventListener('change', ()=>{ eticketTouched=false; render(); });
   els.eticket.addEventListener('input', ()=>{ eticketTouched = true; });
   // 開催情報変更時はETicketの自動再生成を再開できるよう、時間/会場/名前/対戦相手/日付変更でtouchedを解除
