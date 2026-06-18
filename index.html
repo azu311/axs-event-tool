@@ -133,6 +133,7 @@ if(typeof XLSX==='undefined'){
   }
   .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
   .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;}
+  .row-times{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
   .counter{font-size:11px;margin-top:4px;font-family:var(--mono);}
   .counter.over{color:var(--warn);font-weight:700;}
   .counter.ok{color:var(--ok);}
@@ -307,14 +308,18 @@ if(typeof XLSX==='undefined'){
 
     <div class="field">
       <label>時間</label>
-      <div class="row3">
+      <div class="row-times">
         <div>
           <input type="time" id="openTime">
           <div class="hint" style="text-align:center;margin-top:3px;">開場（任意）</div>
         </div>
         <div>
           <input type="time" id="startTime">
-          <div class="hint" style="text-align:center;margin-top:3px;">開始</div>
+          <div class="hint" style="text-align:center;margin-top:3px;" id="startLabel">開始</div>
+        </div>
+        <div id="matchField" style="display:none;">
+          <input type="time" id="matchTime">
+          <div class="hint" style="text-align:center;margin-top:3px;">試合開始</div>
         </div>
         <div>
           <input type="time" id="endTime">
@@ -410,6 +415,7 @@ if(typeof XLSX==='undefined'){
   const els = {
     date:$('eventDate'), name:$('eventName'), venue:$('venue'), seq:$('seq'),
     open:$('openTime'), start:$('startTime'), end:$('endTime'),
+    match:$('matchTime'), matchField:$('matchField'), startLabel:$('startLabel'),
     counter:$('nameCounter'), nameWarn:$('nameWarn'), eticket:$('eticket'),
     opponent:$('opponent'), nameFieldOff:$('nameFieldOff'), nameFieldOn:$('nameFieldOn'),
     onNamePreview:$('onNamePreview')
@@ -476,11 +482,19 @@ if(typeof XLSX==='undefined'){
   function eticketText(){
     const venue = els.venue.value.trim();
     const name = currentEventName();
-    let l5='';
-    const op = els.open.value, st = els.start.value, en = els.end.value;
-    if(op && st) l5 = `開場 ${op}　開始 ${st}`;
-    else if(st) l5 = `開始 ${st}`;
-    else if(op) l5 = `開場 ${op}`;
+    const op = els.open.value, st = els.start.value, mt = els.match.value, en = els.end.value;
+    const parts = [];
+    if(season()==='on'){
+      // オンシーズン: 開場・開演・試合開始
+      if(op) parts.push(`開場 ${op}`);
+      if(st) parts.push(`開演 ${st}`);
+      if(mt) parts.push(`試合開始 ${mt}`);
+    } else {
+      // オフシーズン: 開場・開始
+      if(op) parts.push(`開場 ${op}`);
+      if(st) parts.push(`開始 ${st}`);
+    }
+    const l5 = parts.join('　');
     const l6 = en ? `終了 ${en}` : '';
     return [
       'VOREAS HOKKAIDO',
@@ -512,6 +526,9 @@ if(typeof XLSX==='undefined'){
     // 入力欄の表示切替
     els.nameFieldOff.style.display = isOn ? 'none' : '';
     els.nameFieldOn.style.display  = isOn ? '' : 'none';
+    // 時間：オンシーズンは「開演」+「試合開始」、オフシーズンは「開始」
+    els.startLabel.textContent = isOn ? '開演' : '開始';
+    els.matchField.style.display = isOn ? '' : 'none';
 
     // 名称
     //  オンシーズン : MMDDヴォレアスvs対戦相手（日付はMMDDのみ。yyyymmdd前置はしない）
@@ -730,14 +747,14 @@ if(typeof XLSX==='undefined'){
   $('exportXlsx').addEventListener('click', exportExcel);
 
   // ---- listeners ----
-  ['date','name','venue','seq','open','start','end'].forEach(k=>{
+  ['date','name','venue','seq','open','start','match','end'].forEach(k=>{
     els[k].addEventListener('input', render);
   });
   document.querySelectorAll('input[name=season]').forEach(r=>r.addEventListener('change', ()=>{ eticketTouched=false; render(); }));
   els.opponent.addEventListener('change', ()=>{ eticketTouched=false; render(); });
   els.eticket.addEventListener('input', ()=>{ eticketTouched = true; });
   // 開催情報変更時はETicketの自動再生成を再開できるよう、時間/会場/名前/対戦相手/日付変更でtouchedを解除
-  ['date','name','venue','open','start','end'].forEach(k=>{
+  ['date','name','venue','open','start','match','end'].forEach(k=>{
     els[k].addEventListener('input', ()=>{ eticketTouched = false; render(); });
   });
 
