@@ -5,6 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AXS イベント登録サポート｜VOREAS</title>
 <script src="vendor/xlsx.full.min.js"></script>
+<script>
+/* vendor/ が無い環境（チャット内プレビュー等）では cdnjs から読み込む */
+if(typeof XLSX==='undefined'){
+  var s=document.createElement('script');
+  s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+  document.head.appendChild(s);
+}
+</script>
 <style>
   :root{
     --vor-orange:#F26F21;
@@ -93,7 +101,7 @@
     margin-bottom:5px;
   }
   .hint{font-size:11px;color:var(--ink-soft);font-weight:400;}
-  input[type=text],input[type=date],input[type=time],input[type=number]{
+  input[type=text],input[type=date],input[type=time],input[type=number],select{
     width:100%;
     padding:9px 11px;
     border:1px solid var(--line);
@@ -103,7 +111,7 @@
     font-size:14px;
     color:var(--ink);
   }
-  input:focus{outline:2px solid var(--vor-orange);outline-offset:0;border-color:transparent;}
+  input:focus,select:focus{outline:2px solid var(--vor-orange);outline-offset:0;border-color:transparent;}
   .seg{display:flex;gap:8px;}
   .seg label{
     flex:1;
@@ -238,11 +246,32 @@
       <input type="date" id="eventDate">
     </div>
 
-    <div class="field">
+    <!-- オフシーズン用：自由入力 -->
+    <div class="field" id="nameFieldOff">
       <label>イベント名 <span class="hint">／ 全角30文字まで</span></label>
       <input type="text" id="eventName" placeholder="例：シーズン報告会">
       <div class="counter" id="nameCounter">全角換算 0 / 30</div>
       <div class="namewarn" id="nameWarn"></div>
+    </div>
+
+    <!-- オンシーズン用：対戦相手選択 -->
+    <div class="field" id="nameFieldOn" style="display:none;">
+      <label>対戦相手 <span class="hint">／ ヴォレアスvs◯◯ を自動生成</span></label>
+      <select id="opponent">
+        <option value="">選択してください</option>
+        <option value="STINGS愛知">STINGS愛知</option>
+        <option value="日鉄堺BZ">日鉄堺BZ</option>
+        <option value="サントリー">サントリー</option>
+        <option value="東レ静岡">東レ静岡</option>
+        <option value="WD名古屋">WD名古屋</option>
+        <option value="広島TH">広島TH</option>
+        <option value="VC長野">VC長野</option>
+        <option value="大阪B">大阪B</option>
+        <option value="東京GB">東京GB</option>
+        <option value="イエスタ">イエスタ</option>
+        <option value="フラゴラ">フラゴラ</option>
+      </select>
+      <div class="hint" id="onNamePreview" style="margin-top:5px;">開催日と対戦相手を選択すると名称が生成されます。</div>
     </div>
 
     <div class="field">
@@ -378,7 +407,9 @@
   const els = {
     date:$('eventDate'), name:$('eventName'), venue:$('venue'), seq:$('seq'),
     open:$('openTime'), start:$('startTime'), end:$('endTime'),
-    counter:$('nameCounter'), nameWarn:$('nameWarn'), eticket:$('eticket')
+    counter:$('nameCounter'), nameWarn:$('nameWarn'), eticket:$('eticket'),
+    opponent:$('opponent'), nameFieldOff:$('nameFieldOff'), nameFieldOn:$('nameFieldOn'),
+    onNamePreview:$('onNamePreview')
   };
 
   // ---- helpers ----
@@ -393,6 +424,18 @@
   }
   function season(){ return document.querySelector('input[name=season]:checked').value; }
   function seat(){ return document.querySelector('input[name=seat]:checked').value; }
+
+  // シーズンに応じたイベント名
+  // オンシーズン: MMDDヴォレアスvs対戦相手 / オフシーズン: 自由入力のイベント名
+  function currentEventName(){
+    if(season()==='on'){
+      const d = ymd();
+      const mmdd = d ? d.slice(4,8) : '';
+      const opp = els.opponent.value;
+      return (mmdd && opp) ? `${mmdd}ヴォレアスvs${opp}` : '';
+    }
+    return els.name.value.trim();
+  }
 
   // 全角換算カウント（半角=0.5, 全角=1）
   function fullWidthCount(s){
@@ -423,7 +466,7 @@
 
   function eticketText(){
     const venue = els.venue.value.trim();
-    const name = els.name.value.trim();
+    const name = currentEventName();
     let l5='';
     const op = els.open.value, st = els.start.value, en = els.end.value;
     if(op && st) l5 = `開場 ${op}　開始 ${st}`;
@@ -451,13 +494,24 @@
 
   function render(){
     const date = ymd();
-    const name = els.name.value.trim();
+    const isOn = season()==='on';
+    const eventName = currentEventName();
     const venue = els.venue.value.trim();
     const seqN = pad(parseInt(els.seq.value||'1',10));
     const cat = categories();
 
-    // 名称: yyyymmdd + イベント名
-    setV('o_name', (date && name) ? (date + name) : '', '開催日とイベント名を入力');
+    // 入力欄の表示切替
+    els.nameFieldOff.style.display = isOn ? 'none' : '';
+    els.nameFieldOn.style.display  = isOn ? '' : 'none';
+
+    // 名称
+    //  オンシーズン : MMDDヴォレアスvs対戦相手（日付はMMDDのみ。yyyymmdd前置はしない）
+    //  オフシーズン : yyyymmdd + イベント名
+    let mainName = '';
+    if(isOn){ mainName = eventName; }
+    else { mainName = (date && eventName) ? (date + eventName) : ''; }
+    setV('o_name', mainName, isOn ? '開催日と対戦相手を選択' : '開催日とイベント名を入力');
+
     // 参照ID: yyyymmdd-NN-VOR
     setV('o_refid', date ? `${date}-${seqN}-VOR` : '', '開催日を入力');
     // ベニューマップ（基本情報）= 会場名
@@ -469,8 +523,8 @@
     setV('o_start', (slash() && els.start.value) ? `${slash()} ${els.start.value}` : (slash()? `${slash()} （開始時間を入力）`:''), '開催日・開始時間を入力');
     setV('o_end', slash() ? `${slash()} 23:59` : '', '開催日を入力');
 
-    // ゾーン
-    setV('o_zonename', name, 'イベント名を入力');
+    // ゾーン名称 = イベント名
+    setV('o_zonename', eventName, isOn ? '開催日と対戦相手を選択' : 'イベント名を入力');
     const vmap = seat()==='free' ? 'Test_GA_Map' : venue;
     setV('o_venue2', vmap, (seat()==='free'?'Test_GA_Map':'会場名を入力'));
 
@@ -481,20 +535,21 @@
     // ETicket（未編集なら自動更新）
     if(!eticketTouched){ els.eticket.value = eticketText(); }
 
-    // 文字数カウント
-    const fw = fullWidthCount(name);
-    els.counter.textContent = `全角換算 ${fw % 1 === 0 ? fw : fw.toFixed(1)} / 30`;
-    els.counter.className = 'counter ' + (fw>30 ? 'over' : (name? 'ok':''));
-
-    // オンシーズンの命名チェック
-    let warn = '';
-    if(season()==='on' && name){
-      if(/\s+vs\s+|\svs|vs\s/i.test(name)) warn = '「vs」の前後に半角スペースを入れないでください。';
-      else if(!/vs/i.test(name)) warn = 'オンシーズンはホームチーム名（VOREAS）から記載してください。';
-      else if(!/^VOREAS/i.test(name)) warn = '必ずホームチーム名（VOREAS）から記載してください。';
+    if(isOn){
+      // オンシーズン：生成名称のプレビューと文字数チェック
+      const fw = fullWidthCount(eventName);
+      els.onNamePreview.textContent = eventName
+        ? `名称：${eventName}（全角換算 ${fw % 1 === 0 ? fw : fw.toFixed(1)} / 30）`
+        : '開催日と対戦相手を選択すると名称が生成されます。';
+      els.onNamePreview.style.color = fw>30 ? 'var(--warn)' : 'var(--ink-soft)';
+    } else {
+      // オフシーズン：自由入力の文字数カウント
+      const fw = fullWidthCount(eventName);
+      els.counter.textContent = `全角換算 ${fw % 1 === 0 ? fw : fw.toFixed(1)} / 30`;
+      els.counter.className = 'counter ' + (fw>30 ? 'over' : (eventName? 'ok':''));
+      els.nameWarn.textContent = '';
+      els.nameWarn.classList.remove('show');
     }
-    els.nameWarn.textContent = warn;
-    els.nameWarn.classList.toggle('show', !!warn);
   }
 
   // ---- toast + copy ----
@@ -615,7 +670,7 @@
 
   function fileBase(){
     const date = ymd() || 'nodate';
-    const name = (els.name.value.trim() || 'event').replace(/[\\/:*?"<>|\s]/g,'_');
+    const name = (currentEventName() || 'event').replace(/[\\/:*?"<>|\s]/g,'_');
     return `AXS_${date}_${name}`;
   }
 
@@ -669,10 +724,11 @@
   ['date','name','venue','seq','open','start','end'].forEach(k=>{
     els[k].addEventListener('input', render);
   });
-  document.querySelectorAll('input[name=season],input[name=seat]').forEach(r=>r.addEventListener('change', render));
+  document.querySelectorAll('input[name=season],input[name=seat]').forEach(r=>r.addEventListener('change', ()=>{ eticketTouched=false; render(); }));
+  els.opponent.addEventListener('change', ()=>{ eticketTouched=false; render(); });
   els.eticket.addEventListener('input', ()=>{ eticketTouched = true; });
-  // 開催情報変更時はETicketの自動再生成を再開できるよう、時間/会場/名前変更でtouchedを解除
-  ['name','venue','open','start','end'].forEach(k=>{
+  // 開催情報変更時はETicketの自動再生成を再開できるよう、時間/会場/名前/対戦相手/日付変更でtouchedを解除
+  ['date','name','venue','open','start','end'].forEach(k=>{
     els[k].addEventListener('input', ()=>{ eticketTouched = false; render(); });
   });
 
