@@ -311,7 +311,7 @@ if(typeof XLSX==='undefined'){
       <div class="row-times">
         <div>
           <input type="time" id="openTime">
-          <div class="hint" style="text-align:center;margin-top:3px;">開場（任意）</div>
+          <div class="hint" style="text-align:center;margin-top:3px;" id="openLabel">開場（任意）</div>
         </div>
         <div>
           <input type="time" id="startTime">
@@ -319,13 +319,14 @@ if(typeof XLSX==='undefined'){
         </div>
         <div id="matchField" style="display:none;">
           <input type="time" id="matchTime">
-          <div class="hint" style="text-align:center;margin-top:3px;">試合開始</div>
+          <div class="hint" style="text-align:center;margin-top:3px;">試合開始（必須）</div>
         </div>
-        <div>
+        <div id="endField">
           <input type="time" id="endTime">
           <div class="hint" style="text-align:center;margin-top:3px;">終了</div>
         </div>
       </div>
+      <div class="namewarn" id="timeWarn"></div>
     </div>
   </section>
 
@@ -416,6 +417,7 @@ if(typeof XLSX==='undefined'){
     date:$('eventDate'), name:$('eventName'), venue:$('venue'), seq:$('seq'),
     open:$('openTime'), start:$('startTime'), end:$('endTime'),
     match:$('matchTime'), matchField:$('matchField'), startLabel:$('startLabel'),
+    openLabel:$('openLabel'), endField:$('endField'), timeWarn:$('timeWarn'),
     counter:$('nameCounter'), nameWarn:$('nameWarn'), eticket:$('eticket'),
     opponent:$('opponent'), nameFieldOff:$('nameFieldOff'), nameFieldOn:$('nameFieldOn'),
     onNamePreview:$('onNamePreview')
@@ -484,26 +486,21 @@ if(typeof XLSX==='undefined'){
     const name = currentEventName();
     const op = els.open.value, st = els.start.value, mt = els.match.value, en = els.end.value;
     const parts = [];
+    const lines = ['VOREAS HOKKAIDO', name, venue, ''];
     if(season()==='on'){
-      // オンシーズン: 開場・開演・試合開始
+      // オンシーズン: 5行目=開場・開演 / 6行目=試合開始（終了は書かない）
       if(op) parts.push(`開場 ${op}`);
       if(st) parts.push(`開演 ${st}`);
-      if(mt) parts.push(`試合開始 ${mt}`);
+      lines.push(parts.join('　'));
+      lines.push(mt ? `試合開始 ${mt}` : '');
     } else {
-      // オフシーズン: 開場・開始
+      // オフシーズン: 開場・開始 + 終了
       if(op) parts.push(`開場 ${op}`);
       if(st) parts.push(`開始 ${st}`);
+      lines.push(parts.join('　'));
+      lines.push(en ? `終了 ${en}` : '');
     }
-    const l5 = parts.join('　');
-    const l6 = en ? `終了 ${en}` : '';
-    return [
-      'VOREAS HOKKAIDO',
-      name,
-      venue,
-      '',
-      l5,
-      l6
-    ].join('\n');
+    return lines.join('\n');
   }
 
   // ---- render ----
@@ -526,9 +523,23 @@ if(typeof XLSX==='undefined'){
     // 入力欄の表示切替
     els.nameFieldOff.style.display = isOn ? 'none' : '';
     els.nameFieldOn.style.display  = isOn ? '' : 'none';
-    // 時間：オンシーズンは「開演」+「試合開始」、オフシーズンは「開始」
-    els.startLabel.textContent = isOn ? '開演' : '開始';
+    // 時間：オンシーズンは「開場/開演/試合開始（必須）」、オフシーズンは「開場/開始/終了」
+    els.openLabel.textContent = isOn ? '開場（必須）' : '開場（任意）';
+    els.startLabel.textContent = isOn ? '開演（必須）' : '開始';
     els.matchField.style.display = isOn ? '' : 'none';
+    els.endField.style.display = isOn ? 'none' : '';
+    // 必須時間チェック（オンシーズンのみ）
+    if(isOn){
+      const miss = [];
+      if(!els.open.value) miss.push('開場');
+      if(!els.start.value) miss.push('開演');
+      if(!els.match.value) miss.push('試合開始');
+      els.timeWarn.textContent = miss.length ? `必須の時間が未入力：${miss.join('・')}` : '';
+      els.timeWarn.classList.toggle('show', miss.length>0);
+    } else {
+      els.timeWarn.textContent = '';
+      els.timeWarn.classList.remove('show');
+    }
 
     // 名称
     //  オンシーズン : MMDDヴォレアスvs対戦相手（日付はMMDDのみ。yyyymmdd前置はしない）
